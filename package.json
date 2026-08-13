@@ -1,0 +1,36 @@
+{
+  "name": "dsh-context-viewer",
+  "productName": "DSH上下文查看器",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 上下文查看器：浏览思考链、shell 命令、工具调用与结果的桌面应用",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "node build-main.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "dev": "npm run build:main && concurrently -k -s first 'vite' 'wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .'",
+    "pack": "npm run build && electron-packager . 'DSH上下文查看器' --platform=win32 --arch=x64 --out=release --overwrite --asar"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.10",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^37.0.0",
+    "electron-packager": "^17.1.2",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "wait-on": "^8.0.0"
+  }
+}

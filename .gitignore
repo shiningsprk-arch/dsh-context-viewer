@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+release/
+
+# 验证截图与日志
+shot*.png
+*.log
+debug.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
