@@ -1,0 +1,51 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.node.json
+
+      - name: Build (main + renderer)
+        run: npm run build
+
+      - name: Package Windows portable build
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File pack-manual.ps1
+
+      - name: Create zip archive
+        shell: pwsh
+        run: Compress-Archive -Path 'release/DSH上下文查看器-win32-x64/*' -DestinationPath 'release/dsh-context-viewer-win32-x64.zip' -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-context-viewer-win32-x64
+          path: release/dsh-context-viewer-win32-x64.zip
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/dsh-context-viewer-win32-x64.zip
+          generate_release_notes: true

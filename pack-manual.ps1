@@ -1,7 +1,12 @@
+# 手工组装 Windows 便携版（无需网络下载，使用本地 node_modules/electron/dist）
+# 用法: powershell -ExecutionPolicy Bypass -File pack-manual.ps1 [-OutDir <dir>]
+param(
+  [string]$OutDir = 'release'
+)
 
 $ErrorActionPreference = 'Stop'
-$root = 'C:\Users\plague doctor\Desktop\dsh\dsh-context-viewer'
-$out = Join-Path $root 'release\DSH上下文查看器-win32-x64'
+$root = Split-Path $MyInvocation.MyCommand.Path -Parent
+$out = Join-Path $root (Join-Path $OutDir 'DSH上下文查看器-win32-x64')
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
@@ -26,5 +31,5 @@ Remove-Item (Join-Path $out 'resources\default_app.asar') -Force -ErrorAction Si
 
 # 6. 统计
 $size = (Get-ChildItem $out -Recurse -File | Measure-Object -Property Length -Sum).Sum
-Write-Output ('打包完成: ' + $out)
-Write-Output ('总大小: ' + [math]::Round($size / 1MB, 1) + ' MB')
+Write-Output ('PACK_OK: ' + $out)
+Write-Output ('SIZE_MB: ' + [math]::Round($size / 1MB, 1))

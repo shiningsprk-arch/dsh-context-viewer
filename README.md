@@ -1,5 +1,7 @@
 # 🕵️ DSH上下文查看器
 
+> **[English README](README.en.md)**
+
 DeepSeek Harness 桌面上下文查看器（Electron + React）。浏览历史与实时会话的**完整信息**：
 思考链、shell 命令（pwsh/bash）、工具调用参数与结果、错误、token 统计、原始事件日志。
 
