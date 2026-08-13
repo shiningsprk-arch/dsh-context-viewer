@@ -34,7 +34,7 @@ jobs:
 
       - name: Create zip archive
         shell: pwsh
-        run: Compress-Archive -Path 'release/DSH上下文查看器-win32-x64/*' -DestinationPath 'release/dsh-context-viewer-win32-x64.zip' -Force
+        run: Compress-Archive -Path 'release/DSHContextViewer-win32-x64/*' -DestinationPath 'release/dsh-context-viewer-win32-x64.zip' -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

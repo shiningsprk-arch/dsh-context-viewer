@@ -1,4 +1,4 @@
-# 手工组装 Windows 便携版（无需网络下载，使用本地 node_modules/electron/dist）
+﻿# 手工组装 Windows 便携版（无需网络下载，使用本地 node_modules/electron/dist）
 # 用法: powershell -ExecutionPolicy Bypass -File pack-manual.ps1 [-OutDir <dir>]
 param(
   [string]$OutDir = 'release'
@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $MyInvocation.MyCommand.Path -Parent
-$out = Join-Path $root (Join-Path $OutDir 'DSH上下文查看器-win32-x64')
+$out = Join-Path $root (Join-Path $OutDir 'DSHContextViewer-win32-x64')
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 Copy-Item -Recurse -Force (Join-Path $root 'node_modules\electron\dist\*') $out
 
 # 2. 重命名主程序
-Rename-Item (Join-Path $out 'electron.exe') 'DSH上下文查看器.exe'
+Rename-Item (Join-Path $out 'electron.exe') 'DSHContextViewer.exe'
 
 # 3. app 目录（resources/app，不用 asar，便于修改）
 $appDir = Join-Path $out 'resources\app'

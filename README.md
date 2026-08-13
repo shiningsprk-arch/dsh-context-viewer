@@ -45,7 +45,7 @@ npm run pack
 > ```powershell
 > powershell -ExecutionPolicy Bypass -File pack-manual.ps1
 > ```
-> （复制 Electron 运行时 + dist 产物 + ws 依赖到 release/DSH上下文查看器-win32-x64/）
+> （复制 Electron 运行时 + dist 产物 + ws 依赖到 release/DSHContextViewer-win32-x64/）
 
 ## 自动化验证
 

@@ -54,7 +54,7 @@ npm run pack
 > powershell -ExecutionPolicy Bypass -File pack-manual.ps1
 > ```
 > (Copies the Electron runtime + dist output + the ws dependency into
-> `release/DSH上下文查看器-win32-x64/`.)
+> `release/DSHContextViewer-win32-x64/`.)
 
 ## Automated verification
 
@@ -64,7 +64,7 @@ DOM, click the first session, walk through the main views, take a screenshot, an
 
 ```powershell
 $env:DSH_CV_SHOT='C:\shot.png'
-& '.\release\DSH上下文查看器-win32-x64\DSH上下文查看器.exe'
+& '.\release\DSH上下文查看器-win32-x64\DSHContextViewer.exe'
 ```
 
 ## Data sources
