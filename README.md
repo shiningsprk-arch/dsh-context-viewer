@@ -2,8 +2,22 @@
 
 > **[English README](README.en.md)**
 
+[![Release](https://img.shields.io/github/v/release/shiningsprk-arch/dsh-context-viewer?label=release&color=blue)](https://github.com/shiningsprk-arch/dsh-context-viewer/releases/latest)
+![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078d4)
+![DSH](https://img.shields.io/badge/DSH-0.1.5%2B-8a2be2)
+
 DeepSeek Harness 桌面上下文查看器（Electron + React）。浏览历史与实时会话的**完整信息**：
 思考链、shell 命令（pwsh/bash）、工具调用参数与结果、错误、token 统计、原始事件日志。
+
+![时间线截图：思考链 + 工具调用](docs/screenshot-timeline.png)
+
+## 下载使用
+
+1. 从 [**Releases**](https://github.com/shiningsprk-arch/dsh-context-viewer/releases/latest) 下载 `dsh-context-viewer-win32-x64.zip`
+2. 解压后直接运行 `DSHContextViewer.exe`（Windows x64 便携版，免安装）
+
+> 前提：本机 DSH 正在运行（Web UI 默认 `http://127.0.0.1:3080`）。
+> 查看器会**自动读取 DSH 启动日志中的 token 完成认证**，无需任何手工配置。
 
 ## 功能
 
@@ -19,21 +33,44 @@ DeepSeek Harness 桌面上下文查看器（Electron + React）。浏览历史�
 - **全局搜索**：调用 DSH 的 `session/search` 服务搜索所有会话内容
 - **中文界面**，暗色主题
 
-> **兼容性**：本版本适配 **DSH 0.1.5 及以上**（Typert 协议 + 浏览器认证）。
-> 旧版本 DSH（0.1.0~0.1.2）请使用 v0.1.0 Release。
+## 兼容性
+
+| DSH 版本 | 查看器版本 |
+| --- | --- |
+| **0.1.5 及以上**（Typert 协议 + 浏览器认证） | **v0.2.0+**（当前） |
+| 0.1.0 ~ 0.1.2（旧版协议） | v0.1.0 |
 
 ## 运行前提
 
-- 本机 DSH 正在运行（Web UI 默认在 http://127.0.0.1:3080）
-- Node.js ≥ 22（开发与运行）
-- 查看器会自动从以下日志读取启动 token 并完成认证，无需手工配置：
-  - `%LOCALAPPDATA%\dsh\dsh-web.out.log`（默认）
+- 本机 DSH 正在运行，且版本 ≥ 0.1.5
+- Windows x64（便携版）；源码运行需要 Node.js ≥ 22
+- 查看器自动从以下日志读取最近一次启动的地址与 token：
+  - `%LOCALAPPDATA%\dsh\dsh-web.out.log`（默认位置）
   - `%USERPROFILE%\Desktop\dsh\dsh-service.out.log`（旧版启动脚本位置）
-  - 可用环境变量 `DSH_CV_BASE_URL` 覆盖服务地址
+  - 日志里打印的端口会被自动识别，不需要手动配置
 - 全局搜索依赖服务端会话索引：profile 的 `session-query-sqlite.openAt` 不能为 `never`
-  （建议设为 `first-search`）
+  （建议设为 `first-search`，见下方常见问题）
 
-## 使用
+## 常见问题
+
+**Q：显示"未连接 DSH"或认证失败？**
+查看器从 `%LOCALAPPDATA%\dsh\dsh-web.out.log` 最后一行读取启动 token。如果你的 DSH 启动方式不同、
+日志不在上述位置，可以提 issue；也可用环境变量 `DSH_CV_BASE_URL` 覆盖服务地址（默认 `http://127.0.0.1:3080`）。
+
+**Q：全局搜索报"session search is disabled"？**
+服务端默认关闭了会话索引。在 profile 的 `cordis.patch.yml` 中加入（注意该 patch 是**整段替换**配置，必须带上 `path`）：
+
+```yaml
+- id: session-query-sqlite
+  config:
+    path: ':memory:'
+    openAt: first-search
+```
+
+**Q：DSH 重启后 127.0.0.1 打不开、提示需要认证？**
+这是 DSH Web 本身的浏览器认证机制（token 每次启动都会变），与查看器无关。用日志里最新一行带 `?token=` 的地址在浏览器打开一次即可重新建立信任。
+
+## 开发
 
 ```bash
 # 安装依赖（首次需下载 Electron；国内可用 npmmirror 镜像：
@@ -85,4 +122,14 @@ shared/           共享类型与标签（main/renderer 共用）
 src/              React 渲染层
   components/     组件（时间线、卡片、统计、原始日志、侧边栏…）
   store.tsx       全局状态（会话/事件/过滤/推送归并）
+docs/             截图等文档资源
+```
+
+## CI / Releases
+
+推送到 `main` 自动构建产物；推送 `v*` tag 会构建并自动发布 GitHub Release（含便携版 zip）：
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
 ```

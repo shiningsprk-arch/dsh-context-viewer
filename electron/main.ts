@@ -125,10 +125,26 @@ function createWindow(): void {
         // 回到时间线
         await mainWindow!.webContents.executeJavaScript(`document.querySelectorAll('.view-switch button')[0]?.click()`)
         await new Promise(res => setTimeout(res, 800))
-        const image = await mainWindow!.webContents.capturePage()
+        // 滚动到工具调用区（优先 shell 命令卡片），便于截图展示
+        await mainWindow!.webContents.executeJavaScript(`(() => {
+          const shell = document.querySelector('.card-tool-call .shell-command')
+          const card = shell ? shell.closest('.card-tool-call') : document.querySelector('.card-tool-call')
+          const scroller = document.querySelector('.timeline-scroll')
+          if (card) card.scrollIntoView({ block: 'center' })
+          else if (scroller) scroller.scrollTop = scroller.scrollHeight
+          return true
+        })()`)
+        await new Promise(res => setTimeout(res, 1500))
+        // 等待一次实际重绘后再截图；空帧时重试
+        await mainWindow!.webContents.executeJavaScript(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(0))))`)
+        let image = await mainWindow!.webContents.capturePage()
+        for (let i = 0; i < 3 && image.isEmpty(); i++) {
+          await new Promise(res => setTimeout(res, 1200))
+          image = await mainWindow!.webContents.capturePage()
+        }
         const fs = await import('node:fs')
         fs.writeFileSync(shotPath, image.toPNG())
-        console.log('[shot] saved ' + shotPath)
+        console.log('[shot] saved ' + shotPath + ' (' + image.getSize().width + 'x' + image.getSize().height + ')')
         console.log('[verify-done] ' + JSON.stringify(after))
       } catch (err) {
         console.error('[shot] failed', err)
