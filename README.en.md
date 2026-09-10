@@ -9,25 +9,31 @@ information** of historical and live sessions: chain-of-thought (reasoning), she
 ## Features
 
 - **Session list**: grouped by workspace, with title / time / turns / steps / token stats and live running status
-- **Event timeline**: user messages, assistant messages (with collapsible chain-of-thought),
+- **Event timeline**: user messages, assistant messages / attempts (V3, with collapsible chain-of-thought),
   tool call cards (shell commands highlighted), tool results (including errors),
   turn/step boundaries, streaming deltas (collapsed by default)
 - **Filtering**: filter events by category (user / assistant / thinking / calls / results / boundaries / streaming / other)
-- **Live view**: connects to a running DSH over WebSocket (`/api/events.mux`), new events are appended in real time
+- **Live view**: connects to a running DSH over WebSocket (`/api/remote.mux` → `session/follow`), new events
+  are appended in real time; in-progress output shows as a "live" card
 - **Stats panel**: token usage, context pressure, tool call distribution, event type distribution
-- **Raw log**: per-event raw JSON (searchable, expand-all), including the host-computed tool view
+- **Raw log**: per-event raw JSON (searchable, expand-all)
 - **Export**: Markdown / JSONL / JSON
-- **Global search**: uses DSH's `session.search` service to search across all sessions
+- **Global search**: uses DSH's `session/search` service to search across all sessions
 - **Chinese UI**, dark theme
 
-> **Note for code-mode sessions**: shell commands executed inside `run_code` appear as
-> `tool/code-dispatch` events (e.g. `pwsh` sub-calls). The viewer renders these as
-> highlighted shell-command cards, so you see every command that actually ran.
+> **Compatibility**: this version targets **DSH 0.1.5+** (Typert protocol + browser auth).
+> For older DSH releases (0.1.0–0.1.2) use the v0.1.0 Release.
 
 ## Prerequisites
 
 - A running DSH host (Web UI defaults to http://127.0.0.1:3080)
 - Node.js ≥ 22 (development and runtime)
+- The viewer reads the launch token automatically from:
+  - `%LOCALAPPDATA%\dsh\dsh-web.out.log` (default)
+  - `%USERPROFILE%\Desktop\dsh\dsh-service.out.log` (legacy script location)
+  - set `DSH_CV_BASE_URL` to override the server address
+- Global search requires the server session index: `session-query-sqlite.openAt` must not be
+  `never` (use `first-search`)
 
 ## Usage
 
@@ -59,19 +65,24 @@ npm run pack
 ## Automated verification
 
 Set `DSH_CV_SHOT=<png path>` when starting the app and the main process will inspect the
-DOM, click the first session, walk through the main views, take a screenshot, and quit
-(verification hook; not triggered in normal use).
+DOM, select a session, walk through the main views, take a screenshot, and quit
+(verification hook; not triggered in normal use). Use `DSH_CV_SESSION=<session id>` to
+open a specific session.
 
 ```powershell
 $env:DSH_CV_SHOT='C:\shot.png'
-& '.\release\DSH上下文查看器-win32-x64\DSHContextViewer.exe'
+$env:DSH_CV_SESSION='session-xxxxxxxx-...'
+& '.\release\DSHContextViewer-win32-x64\DSHContextViewer.exe'
 ```
 
 ## Data sources
 
-- HTTP API: `POST /api/<method>` (`workspace.list` / `session.list` / `session.history` / `session.search`)
-- Live streams: WebSocket `/api/events.mux`, `/api/events.host`
-- Durable event log: `~/.dsh/sessions/<workspace>/<session-id>/session.jsonl.zstd`
+- Auth: GET `/?token=<launch token>` to mint a `dsh-auth-*` cookie, sent on HTTP and WebSocket
+- HTTP unary: `POST /api/<endpoint>` (`session/list` / `session/page` / `session/search`), payload `{ args }`
+- Live streams: WebSocket `/api/remote.mux`
+  - `workspace/follow`: workspace baseline + increments (upsert/remove/order/archived)
+  - `session/follow`: session snapshot (records + projections) + live events + `assistant-stream` frames
+- History pagination: `session/page` (`address` + `throughSeq` from the snapshot cursor + `beforeSeq`)
 
 ## Project layout
 
@@ -89,8 +100,8 @@ GitHub Actions builds the Windows portable build on every push to `main` (artifa
 creates a GitHub **Release** with the packaged zip when a `v*` tag is pushed:
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 Download the latest release: <https://github.com/shiningsprk-arch/dsh-context-viewer/releases>

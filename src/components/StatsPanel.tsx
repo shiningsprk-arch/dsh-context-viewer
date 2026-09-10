@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { useStore } from '../store'
-import { fmtDuration, fmtTokens, parseToolArguments } from '../format'
-import type { SessionEvent } from '../../shared/types'
+import { assembleAttemptStream, fmtDuration, fmtTokens, parseToolArguments } from '../format'
+import type { AttemptStreamEntry, SessionEvent } from '../../shared/types'
 
 interface ToolStat { name: string; calls: number; errors: number; totalMs: number }
 
@@ -25,6 +25,17 @@ export function StatsPanel() {
         const content = (ev.data as { message?: { content?: { type?: string; text?: string }[] } }).message?.content ?? []
         for (const b of content) {
           if (b.type === 'reasoning' && b.text) reasoningChars += b.text.length
+        }
+      }
+      if (ev.type === 'assistant/attempt') {
+        const stream = (ev.data as { stream?: AttemptStreamEntry[] }).stream
+        for (const b of assembleAttemptStream(stream)) {
+          if (b.type === 'reasoning' && b.text) reasoningChars += b.text.length
+          if (b.type === 'tool-call') {
+            const t = tools.get(b.name) ?? { name: b.name, calls: 0, errors: 0, totalMs: 0 }
+            t.calls++
+            tools.set(b.name, t)
+          }
         }
       }
       if (ev.type === 'tool/call') {

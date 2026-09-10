@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import type {
-  HistoryEntry, HostFrame, MuxFrame, PushMessage, SessionEvent, SessionSummary, ToolEventView, WorkspaceView,
+  ContentBlock, HistoryEntry, PushMessage, SessionEvent, SessionSummary, ToolEventView, WorkspaceView,
 } from '../shared/types'
 
 export interface FilterState {
@@ -47,6 +47,8 @@ export interface AppState {
   expanded: Set<number>
   showChunks: boolean
   toast: string | null
+  /** 当前选中会话的实时生成内容（V3 assistant-stream）。 */
+  liveStream: { sessionId: string; attemptId: string; revision: number; blocks: ContentBlock[] } | null
 }
 
 type Action =
@@ -65,6 +67,9 @@ type Action =
   | { type: 'pushSessionRemoved'; sessionId: string }
   | { type: 'pushWorkspaceChanged'; workspace: WorkspaceView }
   | { type: 'pushWorkspaceRemoved'; workspaceId: string }
+  | { type: 'workspaceList'; workspaces: WorkspaceView[] }
+  | { type: 'liveStream'; sessionId: string; attemptId: string; revision: number; blocks: ContentBlock[] }
+  | { type: 'liveEnd'; sessionId: string; attemptId: string }
   | { type: 'pushAgentError'; sessionId: string; message: string }
   | { type: 'setView'; view: ViewMode }
   | { type: 'setFilter'; filter: FilterState }
@@ -104,6 +109,7 @@ function reducer(state: AppState, action: Action): AppState {
         loadedTailSeq: null,
         projections: {},
         expanded: new Set(),
+        liveStream: null,
       }
     case 'history':
       return {
@@ -165,6 +171,23 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'pushWorkspaceRemoved':
       return { ...state, workspaces: state.workspaces.filter(w => w.workspaceId !== action.workspaceId) }
+    case 'workspaceList':
+      return { ...state, workspaces: action.workspaces }
+    case 'liveStream':
+      if (action.sessionId !== state.selectedSessionId) return state
+      return {
+        ...state,
+        liveStream: {
+          sessionId: action.sessionId,
+          attemptId: action.attemptId,
+          revision: action.revision,
+          blocks: action.blocks,
+        },
+      }
+    case 'liveEnd':
+      if (!state.liveStream || state.liveStream.sessionId !== action.sessionId) return state
+      if (action.attemptId && state.liveStream.attemptId && state.liveStream.attemptId !== action.attemptId) return state
+      return { ...state, liveStream: null }
     case 'pushAgentError':
       return { ...state, toast: `[agent 错误] ${action.sessionId.slice(0, 12)}: ${action.message}` }
     case 'setView':
@@ -210,6 +233,7 @@ const initialState: AppState = {
   expanded: new Set(),
   showChunks: false,
   toast: null,
+  liveStream: null,
 }
 
 interface StoreCtx {
@@ -252,6 +276,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           break
         case 'host/agent-error':
           dispatch({ type: 'pushAgentError', sessionId: msg.sessionId, message: msg.message })
+          break
+        case 'sessions':
+          dispatch({ type: 'sessions', sessions: msg.sessions })
+          break
+        case 'host/workspace-list':
+          dispatch({ type: 'workspaceList', workspaces: msg.workspaces })
+          break
+        case 'session/stream':
+          dispatch({ type: 'liveStream', sessionId: msg.sessionId, attemptId: msg.attemptId, revision: msg.revision, blocks: msg.blocks })
+          break
+        case 'session/stream-end':
+          dispatch({ type: 'liveEnd', sessionId: msg.sessionId, attemptId: msg.attemptId })
           break
         default:
           break

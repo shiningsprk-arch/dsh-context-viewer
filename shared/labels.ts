@@ -15,6 +15,16 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   'session/end-seed': '种子结束',
   'tool/code-dispatch-start': '代码派发开始',
   'tool/code-dispatch': '代码派发',
+  'assistant/attempt': '助手尝试',
+  'agent/inbox/spliced': '收件箱注入',
+  'system/message': '系统消息',
+  'model/selection': '模型选择',
+  'session/title': '会话标题',
+  'session/title-llm-request': '标题生成请求',
+  'permission/preset': '权限预设',
+  'sandbox/mode': '沙箱模式',
+  'approval/policy': '审批策略',
+  'session/goal': '会话目标',
 }
 
 export function formatEventType(type: string): string {

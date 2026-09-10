@@ -13,6 +13,7 @@ const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
 
 let mainWindow: BrowserWindow | null = null
 let client: DshClient | null = null
+let lastSessionsDigest = ''
 
 function sendPush(msg: PushMessage): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -76,8 +77,10 @@ function createWindow(): void {
           return info
         }
         await verify('boot')
-        // 模拟选择第一个会话
-        await mainWindow!.webContents.executeJavaScript(`document.querySelector('.session-item')?.click()`)
+        // 模拟选择一个会话（DSH_CV_SESSION 指定会话 ID，默认第一个）
+        const wanted = process.env.DSH_CV_SESSION
+        const selector = wanted ? `[data-session-id="${wanted}"]` : '.session-item'
+        await mainWindow!.webContents.executeJavaScript(`document.querySelector('${selector}')?.click()`)
         await new Promise(res => setTimeout(res, 4000))
         const after = await verify('session-selected')
         // 工具调用名称分布
@@ -141,77 +144,53 @@ function createWindow(): void {
 
 function setupDshClient(): void {
   client = new DshClient({
-    onConnectionChange: (connected) => {
-      sendPush({ kind: 'connection', connected, baseUrl: client?.getBaseUrl() ?? '' })
+    onConnectionChange: (connected, baseUrl) => {
+      sendPush({ kind: 'connection', connected, baseUrl })
     },
-    onMuxFrame: (frame) => {
-      switch (frame.type) {
-        case 'session/event':
-          sendPush({ kind: 'session/event', sessionId: frame.sessionId, event: frame.event, view: frame.view })
-          break
-        case 'session/projection':
-          sendPush({ kind: 'session/projection', sessionId: frame.sessionId, key: frame.key, value: frame.value, seq: frame.seq })
-          break
-        case 'session/subscribed':
-          sendPush({ kind: 'session/subscribed', sessionId: frame.sessionId, lastSeq: frame.lastSeq })
-          break
-        case 'approval/requested':
-          sendPush({
-            kind: 'approval/requested', sessionId: frame.sessionId, approvalId: frame.approvalId,
-            toolName: frame.toolName, reason: frame.reason,
-          })
-          break
-        default:
-          break
-      }
+    onWorkspaceList: (workspaces, archivedSessionIds) => {
+      sendPush({ kind: 'host/workspace-list', workspaces, archivedSessionIds })
     },
-    onHostFrame: (frame) => {
-      switch (frame.type) {
-        case 'host/session-status':
-          sendPush({ kind: 'host/session-status', sessionId: frame.sessionId, running: frame.running })
-          break
-        case 'host/session-added':
-          sendPush({ kind: 'host/session-added', sessionId: frame.sessionId, blank: frame.blank, cwd: frame.cwd, agentPreset: frame.agentPreset })
-          break
-        case 'host/session-removed':
-          sendPush({ kind: 'host/session-removed', sessionId: frame.sessionId })
-          break
-        case 'host/workspace-changed':
-          sendPush({ kind: 'host/workspace-changed', workspace: frame.workspace })
-          break
-        case 'host/workspace-removed':
-          sendPush({ kind: 'host/workspace-removed', workspaceId: frame.workspaceId })
-          break
-        case 'host/agent-error':
-          sendPush({ kind: 'host/agent-error', sessionId: frame.sessionId, message: frame.message })
-          break
-        default:
-          break
-      }
+    onSessionEvent: (sessionId, event) => {
+      sendPush({ kind: 'session/event', sessionId, event })
+    },
+    onLiveStream: (sessionId, attemptId, revision, blocks) => {
+      sendPush({ kind: 'session/stream', sessionId, attemptId, revision, blocks })
+    },
+    onLiveEnd: (sessionId, attemptId) => {
+      sendPush({ kind: 'session/stream-end', sessionId, attemptId })
     },
   })
 
   void client.connect().catch(() => { /* 主进程静默，状态由推送反映 */ })
+
+  // 会话列表轮询：感知新增/删除/运行状态/标题变化
+  setInterval(() => {
+    const c = client
+    if (!c || !c.connected) return
+    void c.listSessions().then(sessions => {
+      const digest = JSON.stringify(sessions.map(s => [s.sessionId, s.running, s.updatedAt, s.blank]))
+      if (digest !== lastSessionsDigest) {
+        lastSessionsDigest = digest
+        sendPush({ kind: 'sessions', sessions })
+      }
+    }).catch(() => { /* ignore */ })
+  }, 4000)
 }
 
 function registerIpc(): void {
   const api: IpcApi = {
     async getSnapshot(): Promise<Snapshot> {
       const baseUrl = client?.getBaseUrl() ?? ''
-      let workspaces: WorkspaceView[] = []
       let sessions: SessionSummary[] = []
-      let connected = client?.connected ?? false
+      const connected = client?.connected ?? false
       if (client) {
         try {
-          const [w, s] = await Promise.all([client.listWorkspaces(), client.listSessions()])
-          workspaces = w
-          sessions = s
-          connected = true
+          sessions = await client.listSessions()
         } catch {
-          connected = false
+          // 连接失败时保留空列表，状态由连接推送反映
         }
       }
-      return { connected, baseUrl, workspaces, sessions }
+      return { connected, baseUrl, workspaces: client?.getWorkspaces() ?? [], sessions }
     },
     async listSessions(): Promise<SessionSummary[]> {
       if (!client) return []
@@ -219,7 +198,15 @@ function registerIpc(): void {
     },
     async sessionHistory(sessionId: string, beforeSeq?: number, maxMessages?: number): Promise<HistoryResult> {
       if (!client) throw new Error('未连接 DSH')
-      return client.sessionHistory(sessionId, beforeSeq, maxMessages)
+      if (beforeSeq === undefined) {
+        const snapshot = await client.followSession(sessionId, maxMessages ?? 400)
+        return {
+          events: snapshot.records.map(r => ({ event: r.event })),
+          hasMore: snapshot.hasMore,
+          projections: snapshot.projections,
+        }
+      }
+      return client.sessionPage(sessionId, beforeSeq, maxMessages)
     },
     async searchSessions(query: string): Promise<SearchResult[]> {
       if (!client) return []

@@ -7,6 +7,7 @@ import { ToolCallCard } from './ToolCallCard'
 import { ToolResultCard } from './ToolResultCard'
 import { UserMessageCard } from './UserMessageCard'
 import { AssistantMessageCard } from './AssistantMessageCard'
+import { AssistantAttemptCard } from './AssistantAttemptCard'
 import { ChunkRow } from './ChunkRow'
 import { BoundaryRow } from './BoundaryRow'
 import { OtherEventRow } from './OtherEventRow'
@@ -25,6 +26,8 @@ export function EventRow({ entry, expanded, onToggleExpand }: EventRowProps) {
       return <UserMessageCard event={ev as never} />
     case 'assistant/message':
       return <AssistantMessageCard event={ev as never} expanded={expanded} onToggleExpand={onToggleExpand} />
+    case 'assistant/attempt':
+      return <AssistantAttemptCard event={ev as never} expanded={expanded} onToggleExpand={onToggleExpand} />
     case 'assistant/chunk':
       return <ChunkRow event={ev as never} expanded={expanded} onToggleExpand={onToggleExpand} />
     case 'tool/call':

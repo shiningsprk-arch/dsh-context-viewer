@@ -1,4 +1,4 @@
-import type { ContentBlock } from '../shared/types'
+import type { AttemptStreamEntry, ContentBlock, MessageSource } from '../shared/types'
 
 export function fmtTime(ms: number): string {
   const d = new Date(ms)
@@ -90,4 +90,101 @@ export function isShellTool(name: string): boolean {
 
 export function isCodeTool(name: string): boolean {
   return name === 'run_code' || name === 'code'
+}
+
+/** 消息来源标签：V3 的 source 可能是对象。 */
+export function sourceLabel(source: string | MessageSource | undefined | null): string | null {
+  if (!source) return null
+  if (typeof source === 'string') return source === 'human' ? null : source
+  const parts: string[] = []
+  if (typeof source.kind === 'string' && source.kind !== 'human') parts.push(source.kind)
+  if (typeof source.plugin === 'string') parts.push('插件:' + source.plugin)
+  if (typeof source.form === 'string') parts.push(source.form)
+  if (parts.length > 0) return parts.join(' · ')
+  return typeof source.summary === 'string' ? source.summary : null
+}
+
+/** 把 assistant/attempt 的压缩流还原为内容块（对应 dsh-llm BlockAssembler）。 */
+export function assembleAttemptStream(stream: AttemptStreamEntry[] | undefined): ContentBlock[] {
+  if (!Array.isArray(stream)) return []
+  interface Partial {
+    blockType?: string
+    text?: string
+    toolCallId?: string
+    toolCallName?: string
+    args?: string
+    block?: ContentBlock
+  }
+  const partials = new Map<number, Partial>()
+  const get = (index: number): Partial => {
+    let p = partials.get(index)
+    if (!p) {
+      p = {}
+      partials.set(index, p)
+    }
+    return p
+  }
+  for (const entry of stream) {
+    if (!entry || typeof entry !== 'object') continue
+    switch (entry.type) {
+      case 'chunk': {
+        const chunk = entry.chunk as { type?: string; index?: number; blockType?: string; text?: string; id?: string; name?: string; argumentsDelta?: string; block?: ContentBlock }
+        if (typeof chunk?.index !== 'number') break
+        if (chunk.type === 'block-start') get(chunk.index).blockType = chunk.blockType
+        else if (chunk.type === 'text-delta') {
+          const p = get(chunk.index)
+          p.blockType ??= 'text'
+          p.text = (p.text ?? '') + (chunk.text ?? '')
+        } else if (chunk.type === 'reasoning-delta') {
+          const p = get(chunk.index)
+          p.blockType ??= 'reasoning'
+          p.text = (p.text ?? '') + (chunk.text ?? '')
+        } else if (chunk.type === 'tool-call-delta') {
+          const p = get(chunk.index)
+          p.blockType ??= 'tool-call'
+          if (chunk.id) p.toolCallId = chunk.id
+          if (chunk.name) p.toolCallName = chunk.name
+          p.args = (p.args ?? '') + (chunk.argumentsDelta ?? '')
+        } else if (chunk.type === 'block-end' && chunk.block) {
+          get(chunk.index).block = chunk.block
+        }
+        break
+      }
+      case 'text-chunks':
+      case 'reasoning-chunks': {
+        const p = get(entry.index)
+        p.blockType ??= entry.type === 'text-chunks' ? 'text' : 'reasoning'
+        p.text = (p.text ?? '') + entry.texts.join('')
+        break
+      }
+      case 'tool-call-chunks': {
+        const p = get(entry.index)
+        p.blockType ??= 'tool-call'
+        p.toolCallId = entry.id
+        if (entry.name) p.toolCallName = entry.name
+        p.args = (p.args ?? '') + entry.args.join('')
+        break
+      }
+      default:
+        break
+    }
+  }
+  const blocks: ContentBlock[] = []
+  const indexes = [...partials.keys()].sort((a, b) => a - b)
+  for (const i of indexes) {
+    const p = partials.get(i)
+    if (!p) continue
+    if (p.block) {
+      blocks.push(p.block)
+      continue
+    }
+    if (p.blockType === 'tool-call') {
+      blocks.push({ type: 'tool-call', id: p.toolCallId ?? 'call-' + i, name: p.toolCallName ?? '', arguments: p.args ?? '' })
+    } else if (p.blockType === 'reasoning') {
+      if (p.text) blocks.push({ type: 'reasoning', text: p.text })
+    } else if (p.text) {
+      blocks.push({ type: 'text', text: p.text })
+    }
+  }
+  return blocks
 }

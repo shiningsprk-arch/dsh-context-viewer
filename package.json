@@ -1,7 +1,7 @@
 {
   "name": "dsh-context-viewer",
   "productName": "DSH上下文查看器",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DeepSeek Harness 上下文查看器：浏览思考链、shell 命令、工具调用与结果的桌面应用",
   "private": true,
   "main": "dist/main/main.js",

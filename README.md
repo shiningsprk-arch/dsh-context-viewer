@@ -8,20 +8,30 @@ DeepSeek Harness 桌面上下文查看器（Electron + React）。浏览历史�
 ## 功能
 
 - **会话列表**：按 workspace 分组，标题/时间/轮次/步骤/token 统计，运行状态实时标记
-- **事件时间线**：用户消息、助手消息（含可折叠思考链）、工具调用卡片（shell 命令高亮）、
+- **事件时间线**：用户消息、助手消息/助手尝试（V3，含可折叠思考链）、工具调用卡片（shell 命令高亮）、
   工具结果（含错误）、轮次/步骤边界、流式增量（默认折叠）
 - **过滤**：按事件类别（用户/助手/思考/调用/结果/边界/流式/其他）过滤
-- **实时视图**：通过 WebSocket 连接运行中的 DSH（/api/events.mux），新事件实时追加
+- **实时视图**：通过 WebSocket 连接运行中的 DSH（`/api/remote.mux` → `session/follow`），新事件实时追加；
+  生成中的助手输出显示为"实时生成中"卡片
 - **统计面板**：token 用量、上下文压力、工具调用分布、事件类型分布
-- **原始日志**：逐事件原始 JSON（可搜索、可全部展开），含 host 计算的 tool view
+- **原始日志**：逐事件原始 JSON（可搜索、可全部展开）
 - **导出**：Markdown / JSONL / JSON
-- **全局搜索**：调用 DSH 的 session.search 服务搜索所有会话内容
+- **全局搜索**：调用 DSH 的 `session/search` 服务搜索所有会话内容
 - **中文界面**，暗色主题
+
+> **兼容性**：本版本适配 **DSH 0.1.5 及以上**（Typert 协议 + 浏览器认证）。
+> 旧版本 DSH（0.1.0~0.1.2）请使用 v0.1.0 Release。
 
 ## 运行前提
 
 - 本机 DSH 正在运行（Web UI 默认在 http://127.0.0.1:3080）
 - Node.js ≥ 22（开发与运行）
+- 查看器会自动从以下日志读取启动 token 并完成认证，无需手工配置：
+  - `%LOCALAPPDATA%\dsh\dsh-web.out.log`（默认）
+  - `%USERPROFILE%\Desktop\dsh\dsh-service.out.log`（旧版启动脚本位置）
+  - 可用环境变量 `DSH_CV_BASE_URL` 覆盖服务地址
+- 全局搜索依赖服务端会话索引：profile 的 `session-query-sqlite.openAt` 不能为 `never`
+  （建议设为 `first-search`）
 
 ## 使用
 
@@ -49,19 +59,23 @@ npm run pack
 
 ## 自动化验证
 
-设置 `DSH_CV_SHOT=<png路径>` 启动应用，主进程会自动检查 DOM 状态、模拟选择首个会话、
-遍历主要视图并截图退出（验证钩子，日常使用不触发）。
+设置 `DSH_CV_SHOT=<png路径>` 启动应用，主进程会自动检查 DOM 状态、选择会话、
+遍历主要视图并截图退出（验证钩子，日常使用不触发）。可用 `DSH_CV_SESSION=<会话ID>` 指定要打开的会话。
 
 ```powershell
 $env:DSH_CV_SHOT='C:\shot.png'
-& '.\release\DSH上下文查看器-win32-x64\DSH上下文查看器.exe'
+$env:DSH_CV_SESSION='session-xxxxxxxx-...'
+& '.\release\DSHContextViewer-win32-x64\DSHContextViewer.exe'
 ```
 
 ## 数据来源
 
-- HTTP API：POST /api/<method>（workspace.list / session.list / session.history / session.search）
-- 实时流：WebSocket /api/events.mux、/api/events.host
-- 事件日志落盘：`~/.dsh/sessions/<workspace>/<session-id>/session.jsonl.zstd`
+- 认证：GET `/?token=<启动 token>` 兑换 `dsh-auth-*` cookie，HTTP 与 WebSocket 均携带
+- HTTP unary：POST `/api/<endpoint>`（`session/list` / `session/page` / `session/search`），payload 为 `{ args }`
+- 实时流：WebSocket `/api/remote.mux`
+  - `workspace/follow`：workspace 基线 + 增量（upsert/remove/order/archived）
+  - `session/follow`：会话快照（记录+投影）+ 实时事件 + `assistant-stream` 帧
+- 会话历史分页：`session/page`（`address` + `throughSeq`(snapshot cursor) + `beforeSeq`）
 
 ## 目录结构
 

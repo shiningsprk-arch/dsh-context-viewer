@@ -46,6 +46,7 @@ export function Sidebar() {
           {state.globalSearch.map(item => (
             <button
               key={item.sessionId}
+              data-session-id={item.sessionId}
               className={'session-item' + (state.selectedSessionId === item.sessionId ? ' selected' : '')}
               onClick={() => selectSession(item.sessionId)}
             >
@@ -61,6 +62,7 @@ export function Sidebar() {
           {sortedSessions(w.sessionIds).map(s => (
             <button
               key={s.sessionId}
+              data-session-id={s.sessionId}
               className={'session-item' + (state.selectedSessionId === s.sessionId ? ' selected' : '')}
               onClick={() => selectSession(s.sessionId)}
             >
@@ -83,6 +85,7 @@ export function Sidebar() {
           {orphanSessions.map(s => (
             <button
               key={s.sessionId}
+              data-session-id={s.sessionId}
               className={'session-item' + (state.selectedSessionId === s.sessionId ? ' selected' : '')}
               onClick={() => selectSession(s.sessionId)}
             >

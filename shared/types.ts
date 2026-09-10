@@ -88,14 +88,31 @@ export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool-call'; id: string; name: string; arguments: string }
 
+/** 消息来源（插件通知等），V3 起 user/message 的 source 是对象。 */
+export interface MessageSource {
+  kind?: string
+  plugin?: string
+  form?: string
+  summary?: string
+  [k: string]: unknown
+}
+
+/** assistant/attempt 的压缩流记录（V3）。 */
+export type AttemptStreamEntry =
+  | { type: 'chunk'; time: number; chunk: StreamChunk }
+  | { type: 'text-chunks'; time0: number; index: number; dt: number[]; texts: string[]; lastTime?: number }
+  | { type: 'reasoning-chunks'; time0: number; index: number; dt: number[]; texts: string[]; lastTime?: number }
+  | { type: 'tool-call-chunks'; time0: number; index: number; dt: number[]; id: string; name?: string; args: string[]; lastTime?: number }
+
 export interface SessionEventDataMap {
   'turn/start': { turn: number }
   'turn/end': { turn: number; reason: unknown }
   'step/start': { turn: number; step: number }
   'step/end': { turn: number; step: number }
-  'user/message': { source?: string; content: unknown; turn?: number }
+  'user/message': { source?: string | MessageSource; content: unknown; turn?: number }
   'assistant/chunk': { turn: number; step: number; chunk: StreamChunk }
-  'assistant/message': { turn: number; step: number; message: { role: string; content: ContentBlock[] }; usage?: Record<string, unknown> }
+  'assistant/attempt': { turn: number; step: number; stream: AttemptStreamEntry[] }
+  'assistant/message': { turn: number; step: number; message: { role: string; content: ContentBlock[]; source?: MessageSource }; usage?: Record<string, unknown>; stream?: AttemptStreamEntry[] }
   'tool/call': { turn: number; step: number; callId: string; name: string; arguments: string }
   'tool/result': {
     turn: number
@@ -110,6 +127,16 @@ export interface SessionEventDataMap {
   'session/end-seed': Record<string, never>
   'tool/code-dispatch-start': { rootCallId: string; parentCallId: string; subCallId: string; name: string; arguments: unknown }
   'tool/code-dispatch': { rootCallId: string; parentCallId: string; subCallId: string; name: string; arguments: unknown }
+  // ---- V3 新增事件 ----
+  'agent/inbox/spliced': { target?: string; start?: number; inserted?: unknown[] }
+  'system/message': Record<string, unknown>
+  'model/selection': Record<string, unknown>
+  'session/title': Record<string, unknown>
+  'session/title-llm-request': Record<string, unknown>
+  'permission/preset': Record<string, unknown>
+  'sandbox/mode': Record<string, unknown>
+  'approval/policy': Record<string, unknown>
+  'session/goal': Record<string, unknown>
 }
 
 export type SessionEventType = keyof SessionEventDataMap
@@ -216,6 +243,10 @@ export type PushMessage =
   | { kind: 'host/workspace-removed'; workspaceId: string }
   | { kind: 'host/agent-error'; sessionId: string; message: string }
   | { kind: 'approval/requested'; sessionId: string; approvalId: string; toolName: string; reason?: string }
+  | { kind: 'sessions'; sessions: SessionSummary[] }
+  | { kind: 'host/workspace-list'; workspaces: WorkspaceView[]; archivedSessionIds?: string[] }
+  | { kind: 'session/stream'; sessionId: string; attemptId: string; revision: number; blocks: ContentBlock[] }
+  | { kind: 'session/stream-end'; sessionId: string; attemptId: string }
 
 /** preload 暴露到 window 的桥。 */
 export interface DshBridge extends IpcApi {

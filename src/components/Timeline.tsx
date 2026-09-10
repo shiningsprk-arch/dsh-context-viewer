@@ -4,6 +4,7 @@ import type { FilterState } from '../store'
 import type { HistoryEntry } from '../../shared/types'
 import { EventRow } from './EventRow'
 import { SessionInfoBar } from './SessionInfoBar'
+import { LiveStreamCard } from './LiveStreamCard'
 
 function matchesFilter(entry: HistoryEntry, filter: FilterState): boolean {
   const type = entry.event.type
@@ -20,6 +21,7 @@ function matchesFilter(entry: HistoryEntry, filter: FilterState): boolean {
       return filter.assistant
     }
     case 'assistant/chunk': return filter.chunks
+    case 'assistant/attempt': return filter.assistant
     case 'tool/call':
     case 'tool/code-dispatch':
     case 'tool/code-dispatch-start':
@@ -130,6 +132,9 @@ export function Timeline() {
             onToggleExpand={seq => dispatch({ type: 'toggleExpand', seq })}
           />
         ))}
+        {state.liveStream && state.liveStream.sessionId === state.selectedSessionId && state.liveStream.blocks.length > 0 && (
+          <LiveStreamCard blocks={state.liveStream.blocks} />
+        )}
         {!state.loading && filtered.length === 0 && (
           <div className="empty-state small">
             <div>{state.events.length > 0 ? '没有匹配的事件（可调整过滤选项）' : '事件加载失败或为空'}</div>
